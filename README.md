@@ -65,7 +65,7 @@ cd ComfyUI/custom_nodes
 
 2. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/ComfyUI-Infinity-Canvas.git
+git clone https://github.com/kreonxv/ComfyUI-Infinity-Canvas.git
 ```
 
 3. Restart ComfyUI
