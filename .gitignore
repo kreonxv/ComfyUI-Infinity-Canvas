@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+# Don't upload your local config if you have one
+config.json

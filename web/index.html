@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComfyUI - Infinity Canvas</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M7 9c-2.5 0-4.5 1.5-4.5 3.5s2 3.5 4.5 3.5c1.5 0 3-1 4.5-3.5C10 10 8.5 9 7 9Z' fill='%237ed6df' opacity='0.9'/%3E%3Cpath d='M17 9c2.5 0 4.5 1.5 4.5 3.5s-2 3.5-4.5 3.5c-1.5 0-3-1-4.5-3.5 1.5-2.5 3-3.5 4.5-3.5Z' fill='%23e056fd' opacity='0.9'/%3E%3C/svg%3E">
+    <style>
+        /* CSS Variables for Easy Theming */
+        :root {
+            --accent-brush: #DE4C2F;
+            --accent-brush-hover: #DE4C2F;
+            --accent-tile: #4ecdc4;
+            --accent-tile-hover: #6ee7df;
+            --accent-glow: rgba(100, 200, 255, 0.4);
+            --accent-orange: #ff9f43;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-bg-hover: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-primary: rgba(255, 255, 255, 0.9);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --shadow-glow: 0 0 30px var(--accent-glow);
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --blur-strong: blur(16px) saturate(180%);
+        }
+
+        body {
+            margin: 0;
+            background: #222;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Glow/Shine Flash Effect */
+        #glow-overlay {
+            position: fixed;
+            pointer-events: none;
+            z-index: 10001;
+            opacity: 0;
+            border-radius: 8px;
+            box-shadow: inset 0 0 80px rgba(255, 159, 67, 0.4), 0 0 100px rgba(255, 159, 67, 0.6);
+            border: 2px solid rgba(255, 159, 67, 0.8);
+            background: rgba(255, 159, 67, 0.15);
+        }
+
+        #glow-overlay.active {
+            animation: glowFlash 1.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        @keyframes glowFlash {
+            0% {
+                opacity: 0;
+                transform: scale(0.95);
+                box-shadow: inset 0 0 40px rgba(255, 159, 67, 0.3), 0 0 50px rgba(255, 159, 67, 0.4);
+            }
+            20% {
+                opacity: 0.9;
+                transform: scale(1);
+                box-shadow: inset 0 0 120px rgba(255, 159, 67, 0.5), 0 0 150px rgba(255, 159, 67, 0.8);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(1.02);
+                box-shadow: inset 0 0 100px rgba(255, 159, 67, 0.4), 0 0 120px rgba(255, 159, 67, 0.6);
+            }
+            100% {
+                opacity: 0;
+                transform: scale(1.05);
+                box-shadow: inset 0 0 60px rgba(255, 159, 67, 0.2), 0 0 80px rgba(255, 159, 67, 0.3);
+            }
+        }
+
+        /* Floating UI Container */
+        #ui-layer {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        #ui-layer.dragging {
+            opacity: 0.85;
+        }
+
+        .button-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            pointer-events: auto;
+            transition: var(--transition-smooth);
+        }
+
+        /* Hide all toolbar elements except info when .toolbar-hidden */
+        .button-row.toolbar-hidden > *:not(.info-container) {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+        }
+
+        .button-row.toolbar-hidden {
+            gap: 0;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+        }
+
+        #canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        button {
+            background: var(--glass-bg);
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 12px;
+            font-weight: 600;
+            backdrop-filter: var(--blur-strong);
+            -webkit-backdrop-filter: var(--blur-strong);
+            transition: var(--transition-smooth);
+            box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            button:hover {
+                background: var(--glass-bg-hover);
+                transform: translateY(-2px) scale(1.05);
+                box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), var(--shadow-glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            }
+
+            button:active {
+                transform: translateY(-1px) scale(1.02);
+            }
+
+            button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+        .icon-btn {
+            font-size: 16px;
+            width: 36px;
+            height: 36px;
+            padding: 0;
+        }
+
+        #modeBtn {
+            height: 36px;
+            padding: 0 16px;
+            min-width: 140px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 12px;
+            background: var(--accent-brush);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: var(--transition-smooth);
+        }
+
+        #modeBtn:hover {
+            background: var(--accent-brush-hover);
+            box-shadow: 0 0 25px rgba(255, 107, 74, 0.5);
+        }
+
+        #modeBtn.tile-mode {
+            background: var(--accent-tile);
+        }
+
+        #modeBtn.tile-mode:hover {
+            background: var(--accent-tile-hover);
+            box-shadow: 0 0 25px rgba(78, 205, 196, 0.5);
+        }
+
+        input[type="range"] {
+            width: 100px;
+            cursor: pointer;
+        }
+
+        b {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        canvas {
+            display: block;
+            outline: none;
+            cursor: crosshair;
+        }
+
+        /* Inference blocker overlay */
+        .inference-blocker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            display: none;
+            pointer-events: all;
+        }
+
+            .inference-blocker.active {
+                display: block;
+            }
+
+        /* 1. This styles the shortcut legend at the top left */
+        .info-container {
+            position: relative;
+            pointer-events: auto;
+        }
+
+        .info-icon {
+            width: 35px;
+            height: 35px;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .info {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 11px;
+            line-height: 1.6;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px 14px;
+            border-radius: 12px;
+            width: max-content;
+            max-width: 400px;
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            pointer-events: none;
+            opacity: 0;
+            transform: scale(0.9);
+            transform-origin: top left;
+            transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            white-space: nowrap;
+        }
+
+        .info-icon:hover + .info,
+        .info:hover {
+            opacity: 1;
+            transform: scale(1);
+            pointer-events: auto;
+        }
+
+        /* 2. This creates a specific style for the logs on the bottom right */
+        .log-entry {
+            background: transparent !important; /* Force remove background */
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            color: #00d2ff;
+            font-weight: bold;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.9); /* Keeps text readable over images */
+        }
+
+        #console-logger {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 10000;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .canvas-status-message {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            backdrop-filter: none !important;
+            color: #50909f;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,1); /* Heavy shadow so it's visible without the box */
+            padding: 4px 8px;
+        }
+
+        /* Drag Preview Ghost Box */
+        #drag-preview {
+            position: fixed;
+            pointer-events: none;
+            border: 3px dashed #ff9f43;
+            background: rgba(255, 159, 67, 0.15);
+            z-index: 10000;
+            display: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Tile Size Group Container */
+        .tile-size-group {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: var(--glass-bg);
+            padding: 6px 12px;
+            border-radius: 12px;
+            backdrop-filter: var(--blur-strong);
+            -webkit-backdrop-filter: var(--blur-strong);
+            box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-border);
+            transition: var(--transition-smooth);
+            border: 1px solid transparent;
+        }
+
+        .tile-size-group:hover {
+            background: var(--glass-bg-hover);
+            border-color: rgba(78, 205, 196, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(78, 205, 196, 0.2);
+        }
+
+        /* Brush Group Container */
+        .brush-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--glass-bg);
+            padding: 6px 12px;
+            border-radius: 12px;
+            backdrop-filter: var(--blur-strong);
+            -webkit-backdrop-filter: var(--blur-strong);
+            box-shadow: var(--shadow-soft), inset 0 1px 0 var(--glass-border);
+            transition: var(--transition-smooth);
+            border: 1px solid transparent;
+        }
+
+        .brush-group:hover {
+            background: var(--glass-bg-hover);
+            border-color: rgba(255, 107, 74, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(255, 107, 74, 0.2);
+        }
+
+        .brush-group.painting {
+            border-color: rgba(255, 107, 74, 0.6);
+            box-shadow: 0 0 25px rgba(255, 107, 74, 0.4);
+        }
+
+        .brush-group.erasing {
+            border-color: rgba(255, 50, 50, 0.6);
+            box-shadow: 0 0 25px rgba(255, 50, 50, 0.4);
+        }
+
+        .brush-group .size-display {
+            background: var(--accent-brush);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 32px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(255, 107, 74, 0.3);
+        }
+
+        .brush-group input[type="range"] {
+            width: 100px;
+            cursor: pointer;
+        }
+
+        .brush-group .separator {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 2px;
+        }
+
+        .brush-group span {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .brush-group input[type="number"] {
+            width: 50px;
+            padding: 4px 6px;
+            background: rgba(40, 40, 40, 0.9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .tile-size-group select {
+            background: rgba(40, 40, 40, 0.9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .tile-size-group input[type="number"] {
+            width: 60px;
+            padding: 4px 8px;
+            background: rgba(40, 40, 40, 0.9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .tile-size-group label {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .tile-size-group .separator {
+            width: 1px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            margin: 0 4px;
+        }
+
+        /* Prompt Container Styling */
+        .prompt-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 12px;
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .prompt-container:hover {
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(100, 200, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+
+        .prompt-container span {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .prompt-container input {
+            width: 280px;
+            padding: 6px 10px;
+            background: rgba(40, 40, 40, 0.9);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .prompt-container input:focus {
+            outline: none;
+            background: rgba(50, 50, 50, 0.95);
+            box-shadow: 0 0 0 2px rgba(100, 200, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="glow-overlay"></div>
+    <div class="inference-blocker" id="inferenceBlocker"></div>
+
+    <div id="console-logger"></div>
+
+    <div id="drag-preview"></div>
+
+    <div id="ui-layer">
+        <div class="button-row">
+            <div class="info-container">
+                <button class="info-icon icon-btn" title="Keyboard Shortcuts">ℹ️</button>
+                <div class="info">
+                    <b>X</b> Toggle Mode • <b>Z</b> Toggle Visibility • <b>H</b> Hide Toolbar • <b>Ctrl+Z</b> Undo • <b>Ctrl+Shift+Z</b> Redo<br>
+                    <b>Ctrl+C</b> Copy Image • <b>Right-click</b> Erase • <b>Middle/Space</b> Pan • <b>Scroll</b> Zoom<br>
+                    <b>Ctrl + Scroll</b> Brush Size • <b>Esc</b> Abort/Cancel<br>
+                    <span style="color: #ff9f43; font-weight: bold;">Note:</span>
+                    If multiple 'Load Image' nodes are used in the workflow<br>
+                    Inpaint node must be titled <b>input_tile</b><br>
+                    For prompt override, text encoder node must be titled <b>input_text</b>
+                </div>
+            </div>
+
+            <button id="saveBtn" class="icon-btn" title="Save PNG">💾</button>
+            <button id="modeBtn">🖌️ BRUSH MODE</button>
+            <button id="toggleMaskBtn" class="icon-btn" title="Toggle Visibility">👁️</button>
+
+            <div id="brushGroup" class="brush-group" title="Brush Settings">
+                <span>Size:</span>
+                <input type="range" id="brushSlider" min="10" max="2000" step="1" value="200">
+                <span id="brushSizeDisplay" class="size-display">200</span>
+                <div class="separator"></div>
+                <span>Feather:</span>
+                <input type="number" id="featherInput" min="0" max="500" step="1" value="0" placeholder="0">
+            </div>
+
+            <div id="tileSizeGroup" class="tile-size-group" title="Tile Size Settings">
+                <select id="sizeSelector">
+                    <option value="512">512</option>
+                    <option value="768">768</option>
+                    <option value="1024" selected>1024</option>
+                    <option value="1536">1536</option>
+                    <option value="2048">2048</option>
+                </select>
+                <div class="separator"></div>
+                <label>
+                    <input type="checkbox" id="customSizeCheckbox" style="cursor: pointer; width: 14px; height: 14px;">
+                    Custom
+                </label>
+                <input type="number" id="customWidth" min="64" max="4096" step="64" value="512" disabled style="opacity: 0.5;" placeholder="W">
+                <span style="color: rgba(255,255,255,0.5); font-size: 12px;">×</span>
+                <input type="number" id="customHeight" min="64" max="4096" step="64" value="768" disabled style="opacity: 0.5;" placeholder="H">
+            </div>
+
+            <div id="promptContainer" class="prompt-container" title="Positive Prompt Override">
+                <span>Prompt:</span>
+                <input type="text" id="promptInput" placeholder="Enter prompt (overrides workflow)">
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+    <script src="script.js" defer></script>
+    <script>
+        // Toolbar dragging disabled — feature removed per user request.
+    </script>
+</body>
+</html>
