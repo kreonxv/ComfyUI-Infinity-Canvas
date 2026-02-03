@@ -70,7 +70,7 @@ git clone https://github.com/kreonxv/ComfyUI-Infinity-Canvas.git
 
 3. Restart ComfyUI
 
-4. Look for the **🎨 Infinity Canvas** button in the ComfyUI interface
+4. Look for the **🎨 Infinity Canvas** button in the ComfyUI interface. Place it wherever you like. It's draggable!
 
 ## 📖 Usage Guide
 
@@ -196,7 +196,7 @@ Contributions are welcome! This project aims to make infinite canvas inpainting 
 
 ### Development
 
-```bash
+```
 # Clone the repository
 git clone https://github.com/yourusername/ComfyUI-Infinity-Canvas.git
 
@@ -226,14 +226,6 @@ MIT License - see LICENSE file for details
 - **Painthua.com** - For inspiration on fluid drawing interfaces
 - **ComfyUI** - For the powerful foundation and extensibility
 - **The AI Art Community** - For continuous feedback and innovation
-
-## 📞 Support
-
-- **Issues** - Report bugs or request features via GitHub Issues
-- **Discussions** - Share your creations and workflows
-- **Discord** - Join the ComfyUI community for real-time help
-
----
 
 **Made with ❤️ for the ComfyUI community**
 
